@@ -1,25 +1,140 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template.Rmd"
+author: "FLat"
+date: "3 11 2019"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.path='O:\\Workspace Latzelsperger\\Education and training\\Programming\\Coursera\\Reproducible Research\\Results/')
 
-## Loading and preprocessing the data
+dataDir <- "O:\\Workspace Latzelsperger\\Education and training\\Programming\\Coursera\\Reproducible Research\\Data"
+codeDir <- "O:\\Workspace Latzelsperger\\Education and training\\Programming\\Coursera\\Reproducible Research\\Code"
+resulstDir <- "O:\\Workspace Latzelsperger\\Education and training\\Programming\\Coursera\\Reproducible Research\\Results"
+```
+
+## Reproducible reseach - Assignment 1
+# Load libraries
+```{r}
+library(data.table)
+library(stats)
+library(ggplot2)
+library(gridExtra)
+```
+
+# Pull data
+```{r}
+setwd(dataDir)
+data <- as.data.table(read.csv("activity.csv"))
+
+```
+
+# Q1: What is mean total number of steps taken per day?
+```{r}
+nStepsDay <- aggregate(steps ~ date, data, FUN=sum, na.rm=TRUE)
+meanStepsDay <- mean(nStepsDay$steps)
+medianStepsDay <- median(nStepsDay$steps)
+```
+
+Mean
+```{r}
+meanStepsDay
+```
+
+Median
+```{r}medianStepsDay
+medianStepsDay
+```
+
+Histogram
+```{r}
+hist <- ggplot(nStepsDay) +
+      geom_histogram(aes(x=steps), bins=5) +
+      ylim(0, 40) +
+      labs(title="Total steps per day", x="Total number of steps", y="Frequency")
+hist
+```
+
+# Q2: What is the average daily activity pattern?
+```{r}
+meanStepsInterval <- aggregate(steps ~ interval, data, FUN = mean, na.rm = TRUE)
+
+timeSeries <- ggplot(meanStepsInterval) +
+      geom_line(aes(x=interval, y=steps)) +
+      labs(title="Average number of steps per interval", x="Intervals", y="Average number of steps")
+timeSeries
+```
+
+The following interval contains the maximum number of steps
+```{r}
+which(meanStepsInterval$steps==max(meanStepsInterval$steps))
+meanStepsInterval[which(meanStepsInterval$steps==max(meanStepsInterval$steps)), "interval"]
+```
 
 
+# Q3: Imputing missing values
+Total number of missing values
+```{r}
+sum(!complete.cases(data))
+```
 
-## What is mean total number of steps taken per day?
+Strategy for imputing NAs:
+First iteration: replace NAs with daily means
+Second iteration: replace remaining NAs with global mean
+
+```{r}
+# Replace NAs with daily mean
+partialMeanStepsDay <- aggregate(steps ~ date, data, FUN=mean, na.rm=TRUE)
+names(partialMeanStepsDay)[2] <- "meanSteps"
+data <- merge(data, partialMeanStepsDay, by="date", all=TRUE)
+data[is.na(data$steps), steps := meanSteps]
+data[is.na(data$steps), steps := mean(data$steps, na.rm=TRUE)]
+data[, meanSteps := NULL]
+setcolorder(data, c("steps", "date", "interval"))
+
+nStepsDay <- aggregate(steps ~ date, data, FUN=sum, na.rm=TRUE)
+meanStepsDay <- mean(nStepsDay$steps)
+medianStepsDay <- median(nStepsDay$steps)
+```
+
+Mean after imputing NAs
+```{r}
+meanStepsDay
+```
+
+Median after imputing NAs
+```{r}
+medianStepsDay
+```
+
+```{r}
+hist2 <- ggplot(nStepsDay) +
+      geom_histogram(aes(x=steps), bins=5) +
+      ylim(0, 40) +
+      labs(title="Total steps per day (NAs imputed)", x="Total number of steps", y="Frequency")
+hist2
+
+grid.arrange(hist, hist2, nrow = 1)
+```
+
+Daily number of steps increases after imputing NAs.
 
 
+# Q4: Are there differences in activity patterns between weekdays and weekends?
+```{r}
+data[, date := as.POSIXct.Date(data$date)]
+data[, dayType := weekdays(data$date)]
+data[dayType != "Samstag" & dayType != "Sonntag", dayType := "weekday"]
+data[dayType == "Samstag" | dayType == "Sonntag", dayType := "weekend"]
+data[, dayType := as.factor(data$dayType)]
 
-## What is the average daily activity pattern?
+meanStepsDayType <- aggregate(steps ~ interval + dayType, data = data, FUN = mean)
+
+timeseries2 <- ggplot(meanStepsDayType, aes(interval, steps)) +
+      geom_line() + 
+      facet_grid(dayType~.) + 
+      labs(x="Intervals", y="Average steps", title = "Average number of steps per day            during the week and on weekends")
+timeseries2
+```
 
 
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
